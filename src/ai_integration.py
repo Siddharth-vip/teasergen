@@ -3,6 +3,8 @@ import openai
 import random
 from dotenv import load_dotenv
 
+from src.video_processor import add_subtitles_and_branding
+
 # Load environment variables
 load_dotenv()
 
@@ -47,69 +49,79 @@ def generate_teaser_clip(video_path, highlights, duration, tone, logo=None, tagl
     """
     Generate a teaser clip from video highlights
     """
-    # This is a simplified implementation
-    # In a real scenario, you would use proper video editing libraries
-    
-    from src.video_processor import concatenate_videoclips, add_branding, add_subtitles_to_video
-    from moviepy.editor import VideoFileClip, AudioFileClip
+    from src.video_processor import add_subtitles_and_branding, concatenate_videoclips
+    from moviepy.editor import VideoFileClip
     
     try:
         # Create output directory if it doesn't exist
         output_dir = "outputs"
         os.makedirs(output_dir, exist_ok=True)
         
-        # Generate output path
+        # Define the final output path
         output_path = os.path.join(output_dir, f"teaser_{tone.lower()}_{int(duration)}s.mp4")
         
         # Extract highlight clips
         clips = []
-        for highlight in highlights[:3]:  # Use top 3 highlights
+        for highlight in highlights[:3]:
             clip = VideoFileClip(video_path).subclip(highlight["start"], highlight["end"])
             clips.append(clip)
         
         # Concatenate clips
-        if clips:
-            final_clip = concatenate_videoclips(clips)
+        if not clips:
+            print("No clips to concatenate. Exiting.")
+            return None
             
-            # Add music if requested
-            if add_music:
-                # In a real implementation, you would add royalty-free music
-                pass
-                
-            # Write the final video
-            final_clip.write_videofile(output_path, codec='libx264', audio_codec='aac')
-            
-            # Add branding if specified
-            logo_path = None
-            if logo:
-                # Save logo to temporary file
-                with open("temp_logo.png", "wb") as f:
-                    f.write(logo.getvalue())
-                logo_path = "temp_logo.png"
-            
-            if logo_path or tagline:
-                output_path = add_branding(output_path, logo_path, tagline)
-            
-            # Add subtitles if requested
-            if add_subtitles:
-                # Generate simulated subtitles
-                subtitles = [
-                    (0.0, 5.0, "Discover something amazing"),
-                    (5.0, 10.0, "With our innovative solution"),
-                    (10.0, 15.0, "Join us today!")
-                ]
-                output_path = add_subtitles_to_video(output_path, subtitles, output_path)
-            
-            # Clean up temporary files
-            if logo_path and os.path.exists(logo_path):
-                os.remove(logo_path)
-                
-            return output_path
+        final_clip = concatenate_videoclips(clips)
         
+        # Define optional elements
+        subtitles_list = None
+        logo_file_path = None
+        tagline_text = None
+
+        if add_subtitles:
+            subtitles_list = [
+                (0.0, 5.0, "Discover something amazing"),
+                (5.0, 10.0, "With our innovative solution"),
+                (10.0, 15.0, "Join us today!")
+            ]
+
+        if logo:
+            logo_file_path = "temp_logo.png"
+            with open(logo_file_path, "wb") as f:
+                f.write(logo.getvalue())
+        
+        if tagline:
+            tagline_text = tagline
+
+        # Add music if requested (This can be done here or inside the branding function)
+        if add_music:
+            # You would add your logic to add music here
+            # For now, we'll assume it's handled elsewhere or isn't a factor in the error
+            pass
+
+        try:
+            # Pass the in-memory clip to the function that handles final processing and writing
+            final_output_path = add_subtitles_and_branding(
+                video_clip=final_clip, # Pass the path of the temporary, concatenated file
+                subtitles=subtitles_list,
+                logo_path=logo_file_path,
+                tagline=tagline_text,
+                output_path=output_path
+            )
+            print(f"Final video with all elements saved to: {final_output_path}")
+
+        finally:
+            if logo_file_path and os.path.exists(logo_file_path):
+                os.remove(logo_file_path)
+            
+            # Clean up temporary concatenated clip
+            final_clip.close()
+
     except Exception as e:
         print(f"Error generating teaser: {e}")
         raise Exception("Failed to generate teaser clip")
-
+    
+    
 def generate_caption(tone="Professional"):
     """
     Generate a social media caption using AI
